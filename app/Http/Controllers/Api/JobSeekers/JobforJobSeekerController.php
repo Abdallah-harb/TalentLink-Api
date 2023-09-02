@@ -27,9 +27,122 @@ class JobforJobSeekerController extends Controller
         }
 
     }
-
+        // search filters
     public function bestJobs(Request $request){
         try {
+            $majors = $request->job_majors; // التخصصات
+            $province_name = $request->provence_name;// المحافظات
+            $province_id = $request->province_id;
+            $cityName = $request->city_name;
+            $city_id = $request->ity_id;
+            $job_type = $request->job_type;
+            $job_level = $request->job_level;
+            $minExp = $request->min_exp;
+            $maxExp = $request->max_exp;
+            $job_date = $request->job_date;
+
+
+            $search =Job::with('majors');
+
+            //search depend on majors
+            if(isset($majors)){
+                $search =  $search->whereHas('majors', function ($q) use ($majors) {
+                    $q->whereIn('majors.id', $majors);
+                });
+            }
+            // search depend on province name or province id
+            if(isset($province_name)){
+                $search = $search->whereHas('province.translations',function ($q) use ($province_name){
+                    $q->where('name','like','%'.$province_name.'%');
+                })->with('province');
+            }
+            // search depend on province id
+            if(isset($province_id)){
+                $search = $search->whereHas('province.translations',function ($q) use ($province_id){
+                    $q->whereIn('province_id',$province_id);
+                })->with('province');
+            }
+
+            //search depend on cityName
+            if(isset($cityName)){
+                $search = $search->whereHas('city.translations',function ($q) use($cityName){
+                    $q->where('name','like','%'.$cityName.'%');
+                })->with('city');
+            }
+
+            //search depend on city_id
+            if(isset($city_id)){
+                $search = $search->whereHas('city.translations',function ($q) use($city_id){
+                    $q->whereIn('city_id',$city_id);
+                })->with('city');
+            }
+
+            //search depend on job_type
+            if(isset($job_type)){
+                $search = $search->where(function ($q) use ($job_type){
+                    foreach ($job_type as $type){
+                        $q->orWhere('job_type',$type);
+                    }
+                });
+            }
+
+            //search depend on job_level
+            if(isset($job_level)){
+                $search = $search->where(function($q) use ($job_level){
+                    foreach ($job_level as $value){
+                        $q->orWhere('job_level',$value);
+                    }
+                });
+            }
+            //search depend on minExp
+            if(isset($minExp)){
+                $search = $search->where('start_year','like','%'.$minExp.'%');
+            }
+            //search depend on minExp
+            if(isset($maxExp)){
+                $search = $search->where('end_year','like','%'.$maxExp.'%');
+            }
+
+            /* return Carbon::now()->subWeek(); // data in last weeks
+
+             return [Carbon::today(),Carbon::now()->subWeek(),Carbon::now()->subMonth(),Carbon::now()->subMonth()->month,date('Y-M-D H:M:S')];
+
+             */
+
+            //search depend on data of jobs
+            if(isset($job_date)){
+                //last 24 hours jobs
+                if($job_date == "last_24_hours"){
+                    $search = $search->whereBetween('created_at',[Carbon::today(),Carbon::now()])
+                        ->orWhereBetween('updated_at',[Carbon::today(),Carbon::now()]);
+                }
+                //last week's jobs
+                if($job_date == "last_week"){
+                    $search = $search->whereBetween('created_at',[Carbon::now()->subWeek(),Carbon::now()])
+                        ->orWhereBetween('updated_at',[Carbon::now()->subWeek(),Carbon::now()]);
+                }
+                //last month jobs
+                if($job_date == "last_month"){
+                    $search = $search->whereBetween('created_at',[Carbon::now()->subMonth(),Carbon::now()])
+                        ->orWhereBetween('updated_at',[Carbon::now()->subMonth(),Carbon::now()]);
+                }
+                //all jobs
+                if($job_date == "all"){
+                    $search = $search;
+                }
+            }
+
+            $search = $search->orderByDesc('id')->get();
+
+            if ($search->isEmpty()) {
+                return ResponseHelper::sendResponseError([],Response::HTTP_BAD_REQUEST,'There are No results  jobs ');
+            }
+            return ResponseHelper::sendResponseSuccess(JobResource::collection($search));
+        } catch (\Exception $ex) {
+            return  ResponseHelper::sendResponseError([], Response::HTTP_BAD_REQUEST, $ex->getMessage());
+        }
+
+        /*try {
             $userprevjobs = PreviousJobsForPreviousExperiences::whereUserId(auth('api')->user()->id)
                 ->pluck('Job_name');
             $bestjobs = Job::with('majors')
@@ -110,7 +223,7 @@ class JobforJobSeekerController extends Controller
 
         } catch (\Exception $ex) {
             return  ResponseHelper::sendResponseError([], Response::HTTP_BAD_REQUEST, $ex->getMessage());
-        }
+        }*/
 
     }
 
